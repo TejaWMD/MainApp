@@ -20,8 +20,13 @@ function checkIsRestrictedUrl(): boolean {
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('portal_current_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('portal_current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      localStorage.removeItem('portal_current_user');
+      return null;
+    }
   });
 
   const [isRestricted, setIsRestricted] = useState<boolean>(checkIsRestrictedUrl);
