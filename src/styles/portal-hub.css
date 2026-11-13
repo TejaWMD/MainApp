@@ -1,66 +1,94 @@
+:root {
+  --wmd-forest: #193116;
+  --wmd-gold: #bf944b;
+  --wmd-honey: #b99c41;
+  --wmd-azure: #1080a7;
+  --wmd-crimson: #83121c;
+  --wmd-olive: #a1a568;
+  --wmd-sage: #b4ad8f;
+
+  --text-strong: #14260f;
+  --text-body:   #2c3a24;
+  --text-muted:  #4d5a44;
+  --text-faint:  #5f6b55;
+}
+
+/* ============================================================
+   LAYOUT — deeper premium background
+   ============================================================ */
 .hub-wrapper {
   min-height: 100vh;
   min-height: 100dvh;
   width: 100%;
-  padding: 0.85rem 1rem 2rem;
+  padding: clamp(0.75rem, 2vw, 1.75rem) clamp(0.85rem, 3vw, 2.5rem) clamp(1rem, 2.5vw, 2rem);
+  position: relative;
+  background:
+    /* warm glow bottom-right */
+    radial-gradient(1200px 700px at 100% 110%, rgba(191, 148, 75, 0.14), transparent 60%),
+    /* cool glow top-left */
+    radial-gradient(900px 600px at -5% -10%, rgba(16, 128, 167, 0.10), transparent 55%),
+    /* soft forest tint centre */
+    radial-gradient(1000px 800px at 50% 40%, rgba(25, 49, 22, 0.05), transparent 70%),
+    /* base */
+    linear-gradient(180deg, #f3efe3 0%, #eee9da 55%, #ece6d4 100%);
+  overflow-x: hidden;
 }
 
-@media (min-width: 640px) {
-  .hub-wrapper {
-    padding: 1.25rem 1.5rem 2.5rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .hub-wrapper {
-    padding: 1.5rem 2rem 3rem;
-  }
+/* very subtle grain overlay */
+.hub-wrapper::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(25, 49, 22, 0.055) 1px, transparent 1px);
+  background-size: 4px 4px;
+  opacity: 0.55;
+  z-index: 0;
 }
 
 .hub-container {
-  max-width: 62rem;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 90rem;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: clamp(0.65rem, 1.6vw, 1.1rem);
 }
 
-@media (min-width: 640px) {
-  .hub-container {
-    gap: 1.25rem;
-  }
-}
-
-/* Compact Top Navbar */
+/* ============================================================
+   TOP BAR
+   ============================================================ */
 .hub-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.65rem 0.9rem;
-  border-radius: 1.15rem;
+  padding: clamp(0.5rem, 1.4vw, 0.85rem) clamp(0.7rem, 2vw, 1.25rem);
+  border-radius: clamp(0.85rem, 2vw, 1.15rem);
   background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(180, 173, 143, 0.45);
-  box-shadow: 0 6px 20px -8px rgba(25, 49, 22, 0.08);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(25, 49, 22, 0.10);
+  box-shadow: 0 6px 22px -10px rgba(25, 49, 22, 0.15);
 }
 
-@media (min-width: 640px) {
-  .hub-topbar {
-    padding: 0.75rem 1.15rem;
-    border-radius: 1.25rem;
-  }
+.hub-brand {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.5rem, 1.4vw, 0.8rem);
+  min-width: 0;
 }
 
 .hub-brand-logo {
-  width: 2.3rem;
-  height: 2.3rem;
-  border-radius: 0.65rem;
+  width: clamp(2rem, 4vw, 2.7rem);
+  height: clamp(2rem, 4vw, 2.7rem);
+  border-radius: clamp(0.5rem, 1.4vw, 0.7rem);
   background: #ffffff;
-  padding: 0.15rem;
-  border: 1px solid rgba(191, 148, 75, 0.4);
-  box-shadow: 0 3px 10px -4px rgba(25, 49, 22, 0.16);
+  padding: 0.1rem;
+  border: 1px solid rgba(25, 49, 22, 0.14);
+  box-shadow: 0 2px 8px -3px rgba(25, 49, 22, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,198 +100,457 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: 0.5rem;
+  border-radius: clamp(0.4rem, 1.2vw, 0.6rem);
 }
+
+.hub-brand-title {
+  font-size: clamp(0.95rem, 2vw, 1.3rem);
+  font-weight: 800;
+  color: var(--text-strong);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-brand-accent { color: var(--wmd-honey); }
 
 .hub-signout-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  min-height: 2.25rem;
-  padding: 0.45rem 0.85rem;
-  border-radius: 0.75rem;
-  font-size: 0.78rem;
+  gap: clamp(0.25rem, 0.7vw, 0.4rem);
+  min-height: clamp(2.1rem, 4vw, 2.55rem);
+  padding: clamp(0.4rem, 1vw, 0.55rem) clamp(0.65rem, 1.8vw, 1rem);
+  border-radius: clamp(0.55rem, 1.4vw, 0.75rem);
+  font-size: clamp(0.72rem, 1.5vw, 0.88rem);
   font-weight: 700;
-  color: var(--palette-ruby);
+  color: var(--wmd-crimson);
   background: rgba(131, 18, 28, 0.07);
-  border: 1px solid rgba(131, 18, 28, 0.16);
+  border: 1px solid rgba(131, 18, 28, 0.22);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+              box-shadow 0.18s ease, transform 0.14s ease;
   flex-shrink: 0;
 }
 
 .hub-signout-btn:hover {
-  background: var(--palette-ruby);
+  background: var(--wmd-crimson);
   color: #ffffff;
-  border-color: var(--palette-ruby);
-  box-shadow: 0 6px 14px -5px rgba(131, 18, 28, 0.35);
+  border-color: var(--wmd-crimson);
+  box-shadow: 0 8px 18px -6px rgba(131, 18, 28, 0.45);
 }
 
-.hub-signout-btn:active {
-  transform: scale(0.97);
+.hub-signout-btn:active { transform: scale(0.97); }
+
+.hub-signout-icon {
+  width: clamp(0.85rem, 1.6vw, 1rem);
+  height: clamp(0.85rem, 1.6vw, 1rem);
 }
 
-/* Compact Greeting Strip */
+@media (max-width: 400px) {
+  .hub-signout-label { display: none; }
+  .hub-signout-btn { padding: 0.55rem; min-width: 2.25rem; }
+}
+
+/* ============================================================
+   GREETING BANNER
+   ============================================================ */
 .hub-greeting-card {
-  padding: 1rem 1.15rem;
-  border-radius: 1.25rem;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(180, 173, 143, 0.45);
-  box-shadow: 0 6px 20px -10px rgba(25, 49, 22, 0.07);
+  position: relative;
+  overflow: hidden;
+  padding: clamp(0.9rem, 2vw, 1.6rem) clamp(1rem, 2.4vw, 1.9rem);
+  border-radius: clamp(0.85rem, 2vw, 1.25rem);
+  background:
+    radial-gradient(600px 260px at 100% 0%, rgba(191, 148, 75, 0.28), transparent 60%),
+    radial-gradient(500px 300px at 0% 100%, rgba(16, 128, 167, 0.22), transparent 65%),
+    linear-gradient(135deg, var(--wmd-forest) 0%, #22401e 45%, #183024 100%);
+  border: 1px solid rgba(25, 49, 22, 0.40);
+  box-shadow: 0 20px 42px -18px rgba(25, 49, 22, 0.60);
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: clamp(0.65rem, 1.4vw, 1.1rem);
+}
+
+.hub-greeting-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 3px 3px;
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 @media (min-width: 640px) {
   .hub-greeting-card {
-    padding: 1.1rem 1.35rem;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
   }
 }
 
+.hub-greeting-inner {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.hub-greeting-eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: clamp(0.62rem, 1.3vw, 0.75rem);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(247, 244, 234, 0.65);
+}
+
 .hub-title {
-  font-size: 1.25rem;
+  margin: 0;
+  font-size: clamp(1.05rem, 2.4vw, 1.75rem);
   font-weight: 800;
-  color: var(--palette-dark-green);
+  color: #f7f4ea;
   letter-spacing: -0.02em;
-  line-height: 1.25;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@media (min-width: 640px) {
-  .hub-title {
-    font-size: 1.45rem;
-  }
+.hub-title-accent { color: #f5c451; }
+
+.hub-greeting-badges {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(0.3rem, 0.9vw, 0.55rem);
 }
 
-/* Compact Workspace Grid */
+.hub-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(0.3rem, 0.7vw, 0.45rem);
+  padding: clamp(0.28rem, 0.7vw, 0.45rem) clamp(0.55rem, 1.3vw, 0.85rem);
+  border-radius: 9999px;
+  font-size: clamp(0.68rem, 1.4vw, 0.82rem);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.hub-badge-role {
+  background: rgba(255, 255, 255, 0.14);
+  color: #f7f4ea;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.hub-badge-dept {
+  background: rgba(191, 148, 75, 0.22);
+  color: #fde6a8;
+  border: 1px solid rgba(191, 148, 75, 0.45);
+}
+
+.hub-badge-icon {
+  width: clamp(0.75rem, 1.6vw, 0.95rem);
+  height: clamp(0.75rem, 1.6vw, 0.95rem);
+  color: #f5c451;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   APPS HEADER
+   ============================================================ */
+.hub-apps-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 clamp(0.15rem, 0.6vw, 0.4rem);
+  margin-top: clamp(0.1rem, 0.5vw, 0.4rem);
+}
+
+.hub-apps-title {
+  margin: 0;
+  font-size: clamp(0.78rem, 1.6vw, 1rem);
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+
+.hub-apps-count {
+  font-size: clamp(0.66rem, 1.3vw, 0.8rem);
+  font-weight: 600;
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   WORKSPACE GRID — bigger cards on large screens
+   ============================================================ */
 .hub-card-grid {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 0.9rem;
+  gap: clamp(0.6rem, 1.4vw, 1.25rem);
 }
 
-@media (min-width: 640px) {
-  .hub-card-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-  }
+@media (min-width: 560px) {
+  .hub-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (min-width: 1024px) {
-  .hub-card-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.15rem;
-  }
+@media (min-width: 900px) {
+  .hub-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-.hub-bubbly-card {
+@media (min-width: 1400px) {
+  .hub-card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.hub-workspace-card {
   position: relative;
   text-align: left;
-  padding: 1.15rem 1.15rem;
-  border-radius: 1.25rem;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(180, 173, 143, 0.45);
-  box-shadow: 0 8px 22px -10px rgba(25, 49, 22, 0.08);
+  padding: clamp(0.9rem, 1.8vw, 1.6rem);
+  border-radius: clamp(0.85rem, 2vw, 1.25rem);
+  background: #ffffff;
+  border: 1px solid rgba(25, 49, 22, 0.10);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
+    0 8px 26px -14px rgba(25, 49, 22, 0.22);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 9.75rem;
-  transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  min-height: clamp(7.75rem, 13vw, 13rem);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.22s ease,
+              border-color 0.22s ease;
   cursor: pointer;
   outline: none;
+  overflow: hidden;
 }
 
-@media (min-width: 640px) {
-  .hub-bubbly-card {
-    padding: 1.25rem 1.3rem;
-    min-height: 11rem;
+/* Larger cards get even more breathing room above 1200px */
+@media (min-width: 1200px) {
+  .hub-workspace-card {
+    min-height: 15rem;
+    padding: 1.75rem 1.65rem;
+    border-radius: 1.35rem;
   }
 }
 
-.hub-bubbly-card:hover:not(:disabled) {
-  transform: translateY(-3px);
-  border-color: var(--palette-honey);
-  box-shadow: 0 16px 32px -12px rgba(25, 49, 22, 0.14);
+.hub-workspace-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--wmd-forest), var(--wmd-gold));
+  opacity: 0;
+  transition: opacity 0.22s ease;
 }
 
-.hub-bubbly-card:active:not(:disabled) {
-  transform: translateY(0) scale(0.99);
+.hub-workspace-card:hover:not(:disabled) {
+  transform: translateY(-4px);
+  border-color: rgba(191, 148, 75, 0.55);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
+    0 24px 48px -18px rgba(25, 49, 22, 0.32);
+}
+
+.hub-workspace-card:hover:not(:disabled)::before { opacity: 1; }
+
+.hub-workspace-card:active:not(:disabled) {
+  transform: translateY(0) scale(0.995);
+}
+
+.hub-workspace-card:focus-visible {
+  box-shadow:
+    0 0 0 3px rgba(191, 148, 75, 0.45),
+    0 12px 28px -12px rgba(25, 49, 22, 0.25);
+}
+
+/* --- Card internals --- */
+.hub-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
 }
 
 .hub-card-icon-box {
-  width: 2.65rem;
-  height: 2.65rem;
-  border-radius: 0.85rem;
+  width: clamp(2.25rem, 4.5vw, 3.25rem);
+  height: clamp(2.25rem, 4.5vw, 3.25rem);
+  border-radius: clamp(0.6rem, 1.4vw, 0.95rem);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  box-shadow: 0 6px 14px -4px rgba(25, 49, 22, 0.22);
+  box-shadow: 0 8px 18px -8px rgba(25, 49, 22, 0.40);
   transition: transform 0.22s ease;
+  flex-shrink: 0;
 }
 
-.hub-bubbly-card:hover:not(:disabled) .hub-card-icon-box {
-  transform: scale(1.06);
+.hub-card-icon {
+  width: clamp(1rem, 2vw, 1.4rem);
+  height: clamp(1rem, 2vw, 1.4rem);
+}
+
+.hub-workspace-card:hover:not(:disabled) .hub-card-icon-box {
+  transform: scale(1.07) rotate(-2deg);
 }
 
 .hub-card-tag {
-  font-size: 0.68rem;
-  font-weight: 700;
-  padding: 0.25rem 0.65rem;
+  font-size: clamp(0.58rem, 1.2vw, 0.72rem);
+  font-weight: 800;
+  padding: clamp(0.18rem, 0.5vw, 0.32rem) clamp(0.45rem, 1vw, 0.75rem);
   border-radius: 9999px;
-  color: #ffffff;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.hub-card-body {
+  margin-top: clamp(0.55rem, 1.2vw, 1rem);
+  width: 100%;
+  text-align: left;
+  min-width: 0;
 }
 
 .hub-card-name {
-  font-size: 1.05rem;
+  margin: 0;
+  font-size: clamp(0.92rem, 1.9vw, 1.25rem);
   font-weight: 800;
-  color: var(--palette-dark-green);
+  color: var(--text-strong);
   line-height: 1.25;
+  letter-spacing: -0.01em;
   transition: color 0.18s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@media (min-width: 640px) {
-  .hub-card-name {
-    font-size: 1.12rem;
-  }
+.hub-workspace-card:hover:not(:disabled) .hub-card-name {
+  color: var(--wmd-azure);
 }
 
 .hub-card-desc {
-  font-size: 0.78rem;
+  margin: clamp(0.1rem, 0.4vw, 0.25rem) 0 0;
+  font-size: clamp(0.7rem, 1.5vw, 0.92rem);
   font-weight: 500;
-  color: rgba(25, 49, 22, 0.6);
-  margin-top: 0.2rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hub-card-footer {
-  margin-top: 0.9rem;
-  padding-top: 0.65rem;
-  border-top: 1px solid rgba(188, 190, 171, 0.4);
+  margin-top: clamp(0.6rem, 1.3vw, 1.1rem);
+  padding-top: clamp(0.45rem, 1vw, 0.8rem);
+  border-top: 1px solid rgba(25, 49, 22, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
+}
+
+.hub-card-cta {
+  font-size: clamp(0.72rem, 1.5vw, 0.95rem);
+  font-weight: 800;
+  color: var(--text-strong);
+  letter-spacing: 0.02em;
 }
 
 .hub-circle-arrow {
-  width: 1.85rem;
-  height: 1.85rem;
+  width: clamp(1.55rem, 3vw, 2.1rem);
+  height: clamp(1.55rem, 3vw, 2.1rem);
   border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  transition: transform 0.2s ease;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  flex-shrink: 0;
 }
 
-.hub-bubbly-card:hover:not(:disabled) .hub-circle-arrow {
-  transform: translateX(2px) translateY(-1px);
+.hub-circle-arrow-icon {
+  width: clamp(0.75rem, 1.5vw, 1.05rem);
+  height: clamp(0.75rem, 1.5vw, 1.05rem);
+}
+
+.hub-workspace-card:hover:not(:disabled) .hub-circle-arrow {
+  transform: translate(2px, -2px) scale(1.08);
+}
+
+.hub-card-restricted {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.25rem, 0.6vw, 0.45rem);
+  font-size: clamp(0.7rem, 1.5vw, 0.92rem);
+  font-weight: 800;
+  color: var(--wmd-crimson);
+}
+
+.hub-card-restricted-icon {
+  width: clamp(0.8rem, 1.6vw, 1rem);
+  height: clamp(0.8rem, 1.6vw, 1rem);
+}
+
+/* ============================================================
+   REDIRECTING TOAST
+   ============================================================ */
+.hub-toast {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(0.75rem, 1.8vw, 1.5rem);
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(0.75rem, 1.6vw, 1.35rem);
+  padding: clamp(0.6rem, 1.2vw, 0.9rem) clamp(0.9rem, 1.8vw, 1.4rem);
+  border-radius: 9999px;
+  background: var(--wmd-forest);
+  color: #f7f4ea;
+  border: 1px solid rgba(191, 148, 75, 0.45);
+  box-shadow: 0 20px 40px -12px rgba(25, 49, 22, 0.55);
+  font-weight: 700;
+  animation: hub-toast-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  max-width: calc(100vw - 1.5rem);
+  white-space: nowrap;
+}
+
+.hub-toast-text {
+  font-size: clamp(0.72rem, 1.4vw, 0.9rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-toast-status {
+  font-size: clamp(0.66rem, 1.2vw, 0.8rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f5c451;
+}
+
+@keyframes hub-toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .hub-workspace-card,
+  .hub-card-icon-box,
+  .hub-circle-arrow,
+  .hub-signout-btn,
+  .hub-card-name { transition: none; }
+  .hub-toast { animation: none; }
 }

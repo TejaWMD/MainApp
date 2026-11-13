@@ -3,16 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --palette-dark-green: #193116;
-  --palette-sage: #b4ad8f;
-  --palette-honey: #bf944b;
-  --palette-light-sage: #bcbeab;
-  --palette-terracotta: #a55c2a;
-  --palette-ruby: #83121c;
-  --palette-olive: #a1a568;
-  --palette-teal: #1080a7;
-  --palette-mustard: #b99c41;
-  --palette-bg: #f6f4ec;
+  --wmd-navy: #09234e;
+  --wmd-navy-light: #123774;
+  --wmd-gold: #d49b27;
+  --wmd-gold-dark: #b37e14;
+  --wmd-red: #c81e2b;
+  --wmd-blue: #0088cb;
+  --wmd-bg: #f4f6fa;
+  --wmd-surface: #ffffff;
+  --wmd-border: rgba(9, 35, 78, 0.10);
+  --wmd-muted: #5b6b84;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html,
@@ -21,13 +27,14 @@ body {
   padding: 0;
   overflow-x: hidden;
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  color: var(--palette-dark-green);
+  color: var(--wmd-navy);
   min-height: 100vh;
   min-height: 100dvh;
   background:
-    radial-gradient(circle at 88% 10%, rgba(191, 148, 75, 0.16) 0%, transparent 42%),
-    radial-gradient(circle at 12% 90%, rgba(25, 49, 22, 0.08) 0%, transparent 45%),
-    radial-gradient(circle at 50% 40%, rgba(180, 173, 143, 0.22) 0%, transparent 60%),
-    #f6f4ec;
+    radial-gradient(circle at 92% 6%, rgba(212, 155, 39, 0.13) 0%, transparent 38%),
+    radial-gradient(circle at 8% 92%, rgba(9, 35, 78, 0.08) 0%, transparent 42%),
+    radial-gradient(circle at 50% 0%, rgba(0, 136, 203, 0.06) 0%, transparent 50%),
+    var(--wmd-bg);
   background-attachment: fixed;
+  -webkit-tap-highlight-color: transparent;
 }

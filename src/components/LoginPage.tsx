@@ -25,7 +25,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     const cleanPassword = password.trim();
 
     if (!cleanEmail || !cleanPassword) {
-      setError('Please enter your email and password.');
+      setError('Enter your email and password.');
       return;
     }
 
@@ -40,13 +40,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
       if (queryError) {
         console.error('Supabase error:', queryError);
-        setError('Connection error. Please try again.');
+        setError('Connection error. Try again.');
         setIsLoading(false);
         return;
       }
 
       if (!data) {
-        setError('No account found with this email.');
+        setError('No account found for this email.');
         setIsLoading(false);
         return;
       }
@@ -60,19 +60,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       const isAdminRole = data.role === 'admin';
 
       if (activeTab === 'staff' && isAdminRole) {
-        setError('Please switch to the Admin tab to sign in.');
+        setError('Use the Admin tab to sign in.');
         setIsLoading(false);
         return;
       }
 
       if (activeTab === 'admin' && !isAdminRole) {
-        setError('Staff accounts must sign in under Staff.');
+        setError('Use the Staff tab to sign in.');
         setIsLoading(false);
         return;
       }
 
       if (data.status === 'Inactive') {
-        setError('Account inactive. Contact your administrator.');
+        setError('Account inactive. Contact admin.');
         setIsLoading(false);
         return;
       }
@@ -98,121 +98,92 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   return (
     <div className="login-screen">
       <div className="login-card">
-        {/* Brand Header */}
-        <div className="text-center mb-4">
+        {/* Brand Header — logo above title */}
+        <div className="login-brand">
           <div className="login-logo-frame">
             <img src={wmdLogo} alt="WMD Hub" className="login-logo-img" />
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-[#193116] tracking-tight">
-            WMD <span className="text-[#bf944b]">Hub</span>
-          </h1>
+          <div className="login-brand-text">
+            <span className="login-brand-name">WMD</span>
+            <span className="login-brand-accent">Hub</span>
+          </div>
         </div>
 
-        {/* Sign-in Area */}
-        <div className="login-form-box">
-          {/* Role Switcher */}
-          <div className="flex p-1 mb-4 rounded-xl bg-[#bcbeab]/30 border border-[#b4ad8f]/35">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('staff');
-                setError('');
-              }}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                activeTab === 'staff'
-                  ? 'bg-white text-[#193116] shadow-sm'
-                  : 'text-[#193116]/60 hover:text-[#193116]'
-              }`}
-            >
-              <UserIcon className="w-3.5 h-3.5 text-[#1080a7]" />
-              <span>Staff</span>
-            </button>
+        {/* Role Switcher */}
+        <div className="login-tabs">
+          <button
+            type="button"
+            onClick={() => { setActiveTab('staff'); setError(''); }}
+            className={`login-tab ${activeTab === 'staff' ? 'is-active' : ''}`}
+          >
+            <UserIcon className="login-tab-icon" />
+            <span>Staff</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab('admin'); setError(''); }}
+            className={`login-tab ${activeTab === 'admin' ? 'is-active' : ''}`}
+          >
+            <Shield className="login-tab-icon" />
+            <span>Admin</span>
+          </button>
+        </div>
 
+        <form onSubmit={handleSubmit} className="login-form">
+          {error && (
+            <div className="login-error" role="alert">
+              <AlertCircle className="login-error-icon" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="login-field">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email address"
+              autoComplete="email"
+              className="login-input"
+              required
+            />
+            <Mail className="login-input-icon" />
+          </div>
+
+          <div className="login-field">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              autoComplete="current-password"
+              className="login-input"
+              required
+            />
+            <Lock className="login-input-icon" />
             <button
               type="button"
-              onClick={() => {
-                setActiveTab('admin');
-                setError('');
-              }}
-              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                activeTab === 'admin'
-                  ? 'bg-[#193116] text-white shadow-sm'
-                  : 'text-[#193116]/60 hover:text-[#193116]'
-              }`}
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="login-eye-btn"
             >
-              <Shield className="w-3.5 h-3.5 text-[#bf944b]" />
-              <span>Admin</span>
+              {showPassword ? <EyeOff className="login-eye-icon" /> : <Eye className="login-eye-icon" />}
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            {error && (
-              <div className="p-2.5 rounded-xl bg-[#83121c]/10 border border-[#83121c]/20 text-xs font-semibold text-[#83121c] flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
+          <button type="submit" disabled={isLoading} className="login-submit-btn">
+            {isLoading ? (
+              <span>Signing in…</span>
+            ) : (
+              <>
+                <span>Sign In</span>
+                <ArrowRight className="login-submit-arrow" />
+              </>
             )}
+          </button>
+        </form>
 
-            <div>
-              <label className="block text-xs font-semibold text-[#193116]/80 mb-1">
-                Email
-              </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@westmalayan.com"
-                  autoComplete="email"
-                  className="login-input"
-                  required
-                />
-                <Mail className="login-input-icon left-3.5" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#193116]/80 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  className="login-input pr-10"
-                  required
-                />
-                <Lock className="login-input-icon left-3.5" />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-[#193116]/45 hover:text-[#193116] transition-colors cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="login-submit-btn"
-            >
-              {isLoading ? (
-                <span>Signing in...</span>
-              ) : (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-        </div>
+        <p className="login-footnote">WEST MALAYAN</p>
       </div>
     </div>
   );

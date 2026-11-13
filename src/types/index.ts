@@ -28,7 +28,6 @@ export interface User {
 export interface AppItem {
   id: string;
   name: string;
-  subtitle: string;
   url: string;
   badge: string;
   color: string;

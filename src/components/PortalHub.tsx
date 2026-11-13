@@ -13,31 +13,28 @@ interface PortalHubProps {
 const DEFAULT_APPS: AppItem[] = [
   {
     id: 'sales',
-    name: 'Sales Dashboard',
-    subtitle: 'Revenue & orders',
+    name: 'Sales & Collection Dashboard',
     url: 'https://tejawmd.github.io/SalesDashboard/',
-    badge: 'Sales',
+    badge: 'Sales & Collection',
     color: '#1080a7',
     allowed_roles: ['admin', 'manager', 'account_manager'],
     allowed_departments: ['Sales', 'All'],
   },
   {
     id: 'manager',
-    name: 'Manager Dashboard',
-    subtitle: 'Approvals & operations',
+    name: 'Query Portal',
     url: 'https://tejawmd.github.io/ManagerDashboard/',
-    badge: 'Management',
+    badge: 'Query',
     color: '#bf944b',
     allowed_roles: ['admin', 'manager', 'account_manager'],
     allowed_departments: ['Sales', 'Logistics', 'Fin & Acc', 'QAQC', 'HR', 'All'],
   },
   {
     id: 'prediction',
-    name: 'Prediction Sales',
-    subtitle: 'AI forecast & trends',
+    name: 'Sales prediction',
     url: 'https://wmgteja.github.io/PredictionSales/',
     badge: 'Forecasting',
-    color: '#a55c2a',
+    color: '#83121c',
     allowed_roles: ['admin'],
     allowed_departments: ['All', 'Sales'],
   },
@@ -49,30 +46,19 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   prediction: Sparkles,
 };
 
-export const PortalHub: React.FC<PortalHubProps> = ({
-  currentUser,
-  onLogout,
-}) => {
+export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) => {
   const [apps, setApps] = useState<AppItem[]>(DEFAULT_APPS);
   const [redirectingApp, setRedirectingApp] = useState<string | null>(null);
 
-  // Reset redirecting state when returning via browser Back button (bfcache / pageshow / popstate)
   useEffect(() => {
-    const resetRedirectState = () => {
-      setRedirectingApp(null);
-    };
-
+    const resetRedirectState = () => setRedirectingApp(null);
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        setRedirectingApp(null);
-      }
+      if (document.visibilityState === 'visible') setRedirectingApp(null);
     };
-
     window.addEventListener('pageshow', resetRedirectState);
     window.addEventListener('popstate', resetRedirectState);
     window.addEventListener('focus', resetRedirectState);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
       window.removeEventListener('pageshow', resetRedirectState);
       window.removeEventListener('popstate', resetRedirectState);
@@ -88,10 +74,7 @@ export const PortalHub: React.FC<PortalHubProps> = ({
           .from('apps')
           .select('*')
           .eq('is_active', true);
-
-        if (!error && data && data.length > 0) {
-          setApps(data as AppItem[]);
-        }
+        if (!error && data && data.length > 0) setApps(data as AppItem[]);
       } catch (err) {
         console.warn('Could not load apps from Supabase, using defaults', err);
       }
@@ -101,22 +84,17 @@ export const PortalHub: React.FC<PortalHubProps> = ({
 
   const checkAppAccess = (app: AppItem): boolean => {
     if (currentUser.role === 'admin') return true;
-    if (currentUser.accessible_apps && currentUser.accessible_apps.includes(app.id)) {
-      return true;
-    }
+    if (currentUser.accessible_apps && currentUser.accessible_apps.includes(app.id)) return true;
     const roleMatch = app.allowed_roles?.includes(currentUser.role);
     const deptMatch =
       currentUser.department === 'All' ||
       app.allowed_departments?.includes(currentUser.department);
-
     return Boolean(roleMatch && deptMatch);
   };
 
   const handleLaunch = (app: AppItem) => {
     if (!checkAppAccess(app)) return;
-
     setRedirectingApp(app.name);
-
     const ssoPayload = {
       id: currentUser.id,
       email: currentUser.email,
@@ -129,63 +107,64 @@ export const PortalHub: React.FC<PortalHubProps> = ({
       portal_url: window.location.href.split('?')[0].split('#')[0],
       issued_at: Date.now(),
     };
-
     const ssoToken = btoa(encodeURIComponent(JSON.stringify(ssoPayload)));
     const separator = app.url.includes('?') ? '&' : '?';
     const destinationUrl = `${app.url}${separator}sso_token=${encodeURIComponent(ssoToken)}`;
-
-    const fallbackTimer = window.setTimeout(() => {
-      setRedirectingApp(null);
-    }, 3000);
-
+    const fallbackTimer = window.setTimeout(() => setRedirectingApp(null), 3000);
     window.setTimeout(() => {
       window.clearTimeout(fallbackTimer);
       window.location.href = destinationUrl;
     }, 200);
   };
 
+  const accessibleCount = apps.filter(checkAppAccess).length;
+
   return (
     <div className="hub-wrapper">
       <div className="hub-container">
         {/* Top Bar */}
         <header className="hub-topbar">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="hub-brand">
             <div className="hub-brand-logo">
               <img src={wmdLogo} alt="WMD Hub" />
             </div>
-            <h1 className="text-base sm:text-lg font-extrabold text-[#193116] tracking-tight truncate">
-              WMD <span className="text-[#bf944b]">Hub</span>
+            <h1 className="hub-brand-title">
+              WMD <span className="hub-brand-accent">Hub</span>
             </h1>
           </div>
 
-          <button
-            type="button"
-            onClick={onLogout}
-            className="hub-signout-btn"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+          <button type="button" onClick={onLogout} className="hub-signout-btn">
+            <LogOut className="hub-signout-icon" />
+            <span className="hub-signout-label">Sign Out</span>
           </button>
         </header>
 
-        {/* Compact Greeting & Role/Department */}
+        {/* Greeting Banner */}
         <section className="hub-greeting-card">
-          <h2 className="hub-title truncate">
-            Hello, {currentUser.name}
-          </h2>
+          <div className="hub-greeting-inner">
+            <p className="hub-greeting-eyebrow">Welcome back</p>
+            <h2 className="hub-title">
+              Hello, <span className="hub-title-accent">{currentUser.name}</span>
+            </h2>
+          </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#193116]/8 text-[#193116] border border-[#193116]/15">
-              <BadgeCheck className="w-3.5 h-3.5 text-[#a1a568]" />
+          <div className="hub-greeting-badges">
+            <span className="hub-badge hub-badge-role">
+              <BadgeCheck className="hub-badge-icon" />
               <span>{currentUser.role_label || currentUser.role}</span>
             </span>
-
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#bf944b]/15 text-[#a55c2a] border border-[#bf944b]/30">
-              <Briefcase className="w-3.5 h-3.5 text-[#bf944b]" />
+            <span className="hub-badge hub-badge-dept">
+              <Briefcase className="hub-badge-icon" />
               <span>{currentUser.department}</span>
             </span>
           </div>
         </section>
+
+        {/* Apps Header */}
+        <div className="hub-apps-header">
+          <h3 className="hub-apps-title">Your Workspaces</h3>
+          <span className="hub-apps-count">{accessibleCount} available</span>
+        </div>
 
         {/* Workspace Grid */}
         <section className="hub-card-grid" aria-label="Workspaces">
@@ -199,56 +178,45 @@ export const PortalHub: React.FC<PortalHubProps> = ({
                 type="button"
                 onClick={() => handleLaunch(app)}
                 disabled={!hasAccess || Boolean(redirectingApp)}
-                className="hub-bubbly-card group"
+                className="hub-workspace-card group"
                 style={{
-                  opacity: hasAccess ? 1 : 0.55,
+                  opacity: hasAccess ? 1 : 0.6,
                   cursor: hasAccess ? 'pointer' : 'not-allowed',
                 }}
               >
-                {/* Top: Icon + Badge */}
-                <div className="flex items-center justify-between gap-2 w-full">
-                  <div
-                    className="hub-card-icon-box"
-                    style={{ backgroundColor: app.color }}
-                  >
-                    <Icon className="w-5 h-5" />
+                <div className="hub-card-top">
+                  <div className="hub-card-icon-box" style={{ backgroundColor: app.color }}>
+                    <Icon className="hub-card-icon" />
                   </div>
-
                   <span
                     className="hub-card-tag"
-                    style={{ backgroundColor: app.color }}
+                    style={{
+                      backgroundColor: `${app.color}18`,
+                      color: app.color,
+                      border: `1px solid ${app.color}38`,
+                    }}
                   >
                     {app.badge}
                   </span>
                 </div>
 
-                {/* Middle: Name & Short Subtitle */}
-                <div className="mt-3.5 w-full text-left">
-                  <h3 className="hub-card-name group-hover:text-[#bf944b]">
-                    {app.name}
-                  </h3>
-                  <p className="hub-card-desc">
-                    {app.subtitle}
-                  </p>
+                <div className="hub-card-body">
+                  <h3 className="hub-card-name">{app.name}</h3>
                 </div>
 
-                {/* Bottom: Action */}
-                <div className="hub-card-footer w-full">
+                <div className="hub-card-footer">
                   {hasAccess ? (
                     <>
-                      <span className="text-xs font-bold text-[#193116]">
-                        {redirectingApp === app.name ? 'Opening...' : 'Open'}
+                      <span className="hub-card-cta">
+                        {redirectingApp === app.name ? 'Opening…' : 'Open'}
                       </span>
-                      <div
-                        className="hub-circle-arrow"
-                        style={{ backgroundColor: app.color }}
-                      >
-                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      <div className="hub-circle-arrow" style={{ backgroundColor: app.color }}>
+                        <ArrowUpRight className="hub-circle-arrow-icon" />
                       </div>
                     </>
                   ) : (
-                    <div className="flex items-center gap-1.5 text-xs text-[#83121c] font-bold">
-                      <Lock className="w-3.5 h-3.5" />
+                    <div className="hub-card-restricted">
+                      <Lock className="hub-card-restricted-icon" />
                       <span>Restricted</span>
                     </div>
                   )}
@@ -257,15 +225,15 @@ export const PortalHub: React.FC<PortalHubProps> = ({
             );
           })}
         </section>
-
-        {/* Redirecting Toast */}
-        {redirectingApp && (
-          <div className="p-3.5 rounded-xl bg-[#193116] text-white text-xs sm:text-sm font-bold flex items-center justify-between gap-3 shadow-lg">
-            <span>Opening {redirectingApp}...</span>
-            <span className="text-[#bf944b] shrink-0">Redirecting</span>
-          </div>
-        )}
       </div>
+
+      {/* Redirecting Toast */}
+      {redirectingApp && (
+        <div className="hub-toast" role="status" aria-live="polite">
+          <span className="hub-toast-text">Opening {redirectingApp}…</span>
+          <span className="hub-toast-status">Redirecting</span>
+        </div>
+      )}
     </div>
   );
 };

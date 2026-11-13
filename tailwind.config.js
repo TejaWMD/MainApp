@@ -7,26 +7,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        palette: {
-          darkGreen: '#193116',
-          sage: '#b4ad8f',
-          honey: '#bf944b',
-          lightSage: '#bcbeab',
-          terracotta: '#a55c2a',
-          ruby: '#83121c',
-          olive: '#a1a568',
-          teal: '#1080a7',
-          mustard: '#b99c41',
-          creamBg: '#f8f8f5',
+        wmd: {
+          navy: '#09234e',
+          royal: '#10346e',
+          gold: '#d49b27',
+          amber: '#c68e1e',
+          red: '#c81e2b',
+          blue: '#0088cb',
+          surface: '#f4f6fa',
+          ink: '#09234e',
+          muted: '#5b6b84',
         }
       },
-      borderRadius: {
-        'bubbly': '2rem',
-        'super': '2.5rem',
-      },
       boxShadow: {
-        'bubbly': '0 10px 25px -5px rgba(25, 49, 22, 0.08), 0 8px 10px -6px rgba(25, 49, 22, 0.05)',
-        'bubbly-lg': '0 20px 35px -10px rgba(25, 49, 22, 0.12), 0 10px 15px -5px rgba(25, 49, 22, 0.06)',
+        'wmd-sm': '0 4px 14px -4px rgba(9, 35, 78, 0.08)',
+        'wmd-md': '0 12px 28px -8px rgba(9, 35, 78, 0.12)',
+        'wmd-lg': '0 20px 44px -12px rgba(9, 35, 78, 0.16)',
       }
     },
   },
