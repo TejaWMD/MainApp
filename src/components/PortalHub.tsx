@@ -3,6 +3,7 @@ import { TrendingUp, ShieldCheck, Sparkles, ArrowUpRight, Lock, LogOut, Briefcas
 import { User, AppItem } from '../types';
 import { supabase } from '../config/supabaseClient';
 import wmdLogo from '../assets/wmd-logo.jpg';
+import { AppViewer } from './AppViewer';
 import '../styles/portal-hub.css';
 
 interface PortalHubProps {
@@ -48,24 +49,7 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
 
 export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) => {
   const [apps, setApps] = useState<AppItem[]>(DEFAULT_APPS);
-  const [redirectingApp, setRedirectingApp] = useState<string | null>(null);
-
-  useEffect(() => {
-    const resetRedirectState = () => setRedirectingApp(null);
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') setRedirectingApp(null);
-    };
-    window.addEventListener('pageshow', resetRedirectState);
-    window.addEventListener('popstate', resetRedirectState);
-    window.addEventListener('focus', resetRedirectState);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      window.removeEventListener('pageshow', resetRedirectState);
-      window.removeEventListener('popstate', resetRedirectState);
-      window.removeEventListener('focus', resetRedirectState);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
+  const [activeApp, setActiveApp] = useState<{ app: AppItem; url: string } | null>(null);
 
   useEffect(() => {
     async function loadApps() {
@@ -94,7 +78,6 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
 
   const handleLaunch = (app: AppItem) => {
     if (!checkAppAccess(app)) return;
-    setRedirectingApp(app.name);
     const ssoPayload = {
       id: currentUser.id,
       email: currentUser.email,
@@ -110,11 +93,7 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     const ssoToken = btoa(encodeURIComponent(JSON.stringify(ssoPayload)));
     const separator = app.url.includes('?') ? '&' : '?';
     const destinationUrl = `${app.url}${separator}sso_token=${encodeURIComponent(ssoToken)}`;
-    const fallbackTimer = window.setTimeout(() => setRedirectingApp(null), 3000);
-    window.setTimeout(() => {
-      window.clearTimeout(fallbackTimer);
-      window.location.href = destinationUrl;
-    }, 200);
+    setActiveApp({ app, url: destinationUrl });
   };
 
   const accessibleCount = apps.filter(checkAppAccess).length;
@@ -177,7 +156,7 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
                 key={app.id}
                 type="button"
                 onClick={() => handleLaunch(app)}
-                disabled={!hasAccess || Boolean(redirectingApp)}
+                disabled={!hasAccess}
                 className="hub-workspace-card group"
                 style={{
                   opacity: hasAccess ? 1 : 0.6,
@@ -207,9 +186,7 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
                 <div className="hub-card-footer">
                   {hasAccess ? (
                     <>
-                      <span className="hub-card-cta">
-                        {redirectingApp === app.name ? 'Opening…' : 'Open'}
-                      </span>
+                      <span className="hub-card-cta">Open</span>
                       <div className="hub-circle-arrow" style={{ backgroundColor: app.color }}>
                         <ArrowUpRight className="hub-circle-arrow-icon" />
                       </div>
@@ -227,12 +204,13 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
         </section>
       </div>
 
-      {/* Redirecting Toast */}
-      {redirectingApp && (
-        <div className="hub-toast" role="status" aria-live="polite">
-          <span className="hub-toast-text">Opening {redirectingApp}…</span>
-          <span className="hub-toast-status">Redirecting</span>
-        </div>
+      {/* In-App Iframe Viewer */}
+      {activeApp && (
+        <AppViewer
+          app={activeApp.app}
+          url={activeApp.url}
+          onClose={() => setActiveApp(null)}
+        />
       )}
     </div>
   );
