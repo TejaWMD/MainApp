@@ -74,8 +74,30 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     return Boolean(roleMatch && deptMatch);
   };
 
-  const handleLaunch = (app: AppItem) => {
+  const resolveLaunchUrl = async (defaultUrl: string): Promise<string> => {
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+
+    if (!isLocalhost) return defaultUrl;
+
+    const localUrl = 'http://localhost:5174/';
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 400);
+
+    try {
+      await fetch(localUrl, { mode: 'no-cors', signal: controller.signal });
+      return localUrl;
+    } catch {
+      return defaultUrl;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  };
+
+  const handleLaunch = async (app: AppItem) => {
     if (!checkAppAccess(app)) return;
+    const targetUrl = await resolveLaunchUrl(app.url);
     const ssoPayload = {
       id: currentUser.id,
       email: currentUser.email,
@@ -89,8 +111,8 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
       issued_at: Date.now(),
     };
     const ssoToken = btoa(encodeURIComponent(JSON.stringify(ssoPayload)));
-    const separator = app.url.includes('?') ? '&' : '?';
-    const destinationUrl = `${app.url}${separator}sso_token=${encodeURIComponent(ssoToken)}`;
+    const separator = targetUrl.includes('?') ? '&' : '?';
+    const destinationUrl = `${targetUrl}${separator}sso_token=${encodeURIComponent(ssoToken)}`;
     window.location.href = destinationUrl;
   };
 
