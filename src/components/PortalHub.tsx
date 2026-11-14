@@ -3,7 +3,6 @@ import { TrendingUp, ShieldCheck, Sparkles, ArrowUpRight, Lock, LogOut, Briefcas
 import { User, AppItem } from '../types';
 import { supabase } from '../config/supabaseClient';
 import wmdLogo from '../assets/wmd-logo.jpg';
-import { AppViewer } from './AppViewer';
 import '../styles/portal-hub.css';
 
 interface PortalHubProps {
@@ -49,7 +48,6 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
 
 export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) => {
   const [apps, setApps] = useState<AppItem[]>(DEFAULT_APPS);
-  const [activeApp, setActiveApp] = useState<{ app: AppItem; url: string } | null>(null);
 
   useEffect(() => {
     async function loadApps() {
@@ -93,7 +91,7 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     const ssoToken = btoa(encodeURIComponent(JSON.stringify(ssoPayload)));
     const separator = app.url.includes('?') ? '&' : '?';
     const destinationUrl = `${app.url}${separator}sso_token=${encodeURIComponent(ssoToken)}`;
-    setActiveApp({ app, url: destinationUrl });
+    window.location.href = destinationUrl;
   };
 
   const accessibleCount = apps.filter(checkAppAccess).length;
@@ -104,18 +102,20 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
         {/* Top Bar */}
         <header className="hub-topbar">
           <div className="hub-brand">
-            <div className="hub-brand-logo">
-              <img src={wmdLogo} alt="WMD Hub" />
-            </div>
             <h1 className="hub-brand-title">
               WMD <span className="hub-brand-accent">Hub</span>
             </h1>
           </div>
 
-          <button type="button" onClick={onLogout} className="hub-signout-btn">
-            <LogOut className="hub-signout-icon" />
-            <span className="hub-signout-label">Sign Out</span>
-          </button>
+          <div className="hub-topbar-actions">
+            <button type="button" onClick={onLogout} className="hub-signout-btn">
+              <LogOut className="hub-signout-icon" />
+              <span className="hub-signout-label">Sign Out</span>
+            </button>
+            <div className="hub-brand-logo">
+              <img src={wmdLogo} alt="WMD Hub" />
+            </div>
+          </div>
         </header>
 
         {/* Greeting Banner */}
@@ -203,15 +203,6 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
           })}
         </section>
       </div>
-
-      {/* In-App Iframe Viewer */}
-      {activeApp && (
-        <AppViewer
-          app={activeApp.app}
-          url={activeApp.url}
-          onClose={() => setActiveApp(null)}
-        />
-      )}
     </div>
   );
 };
