@@ -46,15 +46,70 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   prediction: Sparkles,
 };
 
+async function fetchChildSiteSignature(baseUrl: string): Promise<string | null> {
+  if (!navigator.onLine) return null;
+  try {
+    const probeUrl = new URL(baseUrl);
+    probeUrl.searchParams.set('_t', String(Date.now()));
+    const response = await fetch(probeUrl.toString(), {
+      cache: 'no-store',
+      headers: {
+        pragma: 'no-cache',
+        'cache-control': 'no-cache, no-store, must-revalidate',
+      },
+    });
+    if (!response.ok) return null;
+
+    const html = await response.text();
+    const assetMatches = Array.from(
+      html.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css)[^"']*)["']/gi),
+      (m) => m[1]
+    ).join('|');
+    const etag = response.headers.get('etag') || '';
+    const lastModified = response.headers.get('last-modified') || '';
+
+    return `${assetMatches}::${etag}::${lastModified}` || html.slice(0, 500);
+  } catch {
+    return null;
+  }
+}
+
 export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) => {
   const [apps, setApps] = useState<AppItem[]>(DEFAULT_APPS);
-  const [activeApp, setActiveApp] = useState<{ app: AppItem; url: string } | null>(null);
+  const [activeApp, setActiveApp] = useState<{
+    app: AppItem;
+    baseUrl: string;
+    url: string;
+  } | null>(null);
   const [isAppLoading, setIsAppLoading] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const activeSignatureRef = useRef<string | null>(null);
+
+  const buildAuthenticatedAppUrl = useCallback(
+    (targetUrl: string): string => {
+      const ssoPayload = {
+        id: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name,
+        role: currentUser.role,
+        role_label: currentUser.role_label,
+        department: currentUser.department,
+        avatar_initials: currentUser.avatar_initials,
+        phone: currentUser.phone || '',
+        portal_url: window.location.href.split('?')[0].split('#')[0],
+        issued_at: Date.now(),
+      };
+      const ssoToken = btoa(encodeURIComponent(JSON.stringify(ssoPayload)));
+      const separator = targetUrl.includes('?') ? '&' : '?';
+      return `${targetUrl}${separator}sso_token=${encodeURIComponent(ssoToken)}&_v=${Date.now()}`;
+    },
+    [currentUser]
+  );
 
   const closeActiveApp = useCallback((fromPopState = false) => {
     setActiveApp(null);
     setIsAppLoading(false);
+    activeSignatureRef.current = null;
     if (!fromPopState && window.history.state?.wmdActiveApp) {
       window.history.back();
     }
@@ -85,6 +140,66 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
       window.removeEventListener('message', handleMessage);
     };
   }, [activeApp, closeActiveApp]);
+
+  // Monitor the currently open child website for new GitHub Pages deployments
+  useEffect(() => {
+    if (!activeApp) return;
+
+    let cancelled = false;
+
+    const checkChildWebsiteUpdate = async () => {
+      const latestSignature = await fetchChildSiteSignature(activeApp.baseUrl);
+      if (cancelled || !latestSignature) return;
+
+      if (!activeSignatureRef.current) {
+        activeSignatureRef.current = latestSignature;
+        return;
+      }
+
+      if (latestSignature !== activeSignatureRef.current) {
+        activeSignatureRef.current = latestSignature;
+        try {
+          await fetch(activeApp.baseUrl, { cache: 'reload', mode: 'no-cors' });
+        } catch {
+          // Ignore cache reload errors
+        }
+        setActiveApp((prev) =>
+          prev
+            ? {
+                ...prev,
+                url: buildAuthenticatedAppUrl(prev.baseUrl),
+              }
+            : null
+        );
+      }
+    };
+
+    void checkChildWebsiteUpdate();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void checkChildWebsiteUpdate();
+      }
+    };
+    const handleFocus = () => {
+      void checkChildWebsiteUpdate();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleFocus);
+    const intervalId = window.setInterval(() => {
+      void checkChildWebsiteUpdate();
+    }, 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleFocus);
+      window.clearInterval(intervalId);
+    };
+  }, [activeApp?.baseUrl, buildAuthenticatedAppUrl]);
 
   useEffect(() => {
     async function loadApps() {
@@ -135,27 +250,22 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
   const handleLaunch = async (app: AppItem) => {
     if (!checkAppAccess(app)) return;
     const targetUrl = await resolveLaunchUrl(app.url);
-    const ssoPayload = {
-      id: currentUser.id,
-      email: currentUser.email,
-      name: currentUser.name,
-      role: currentUser.role,
-      role_label: currentUser.role_label,
-      department: currentUser.department,
-      avatar_initials: currentUser.avatar_initials,
-      phone: currentUser.phone || '',
-      portal_url: window.location.href.split('?')[0].split('#')[0],
-      issued_at: Date.now(),
-    };
-    const ssoToken = btoa(encodeURIComponent(JSON.stringify(ssoPayload)));
-    const separator = targetUrl.includes('?') ? '&' : '?';
-    const destinationUrl = `${targetUrl}${separator}sso_token=${encodeURIComponent(ssoToken)}`;
+
+    // Warm the browser HTTP cache for the child website so it always loads the newest deployment
+    try {
+      await fetch(targetUrl, { cache: 'reload', mode: 'no-cors' });
+    } catch {
+      // Ignore network errors
+    }
+
+    const destinationUrl = buildAuthenticatedAppUrl(targetUrl);
+    activeSignatureRef.current = null;
 
     // Open inside the PWA's own full-screen shell so mobile OS browsers
     // do not show an external URL bar / close-banner sheet.
     window.history.pushState({ wmdActiveApp: app.id }, '');
     setIsAppLoading(true);
-    setActiveApp({ app, url: destinationUrl });
+    setActiveApp({ app, baseUrl: targetUrl, url: destinationUrl });
   };
 
   const handleIframeLoad = () => {
@@ -301,8 +411,6 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
             allow="clipboard-read; clipboard-write; fullscreen; geolocation; camera; microphone"
             onLoad={handleIframeLoad}
           />
-
-          
         </div>
       )}
     </div>
