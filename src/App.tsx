@@ -33,14 +33,15 @@ export const App: React.FC = () => {
 
   // If a child app inside the embedded iframe navigates back to portal_url,
   // notify the parent MainApp shell to close the iframe instead of nesting MainApp.
+  const isEmbeddedInSelf = window.self !== window.top;
   useEffect(() => {
-    if (window.self !== window.top) {
+    if (isEmbeddedInSelf) {
       window.parent.postMessage(
         { type: 'WMD_RETURN_TO_HUB', restricted: checkIsRestrictedUrl() },
         window.location.origin
       );
     }
-  }, []);
+  }, [isEmbeddedInSelf]);
 
   useEffect(() => {
     const syncRestricted = () => setIsRestricted(checkIsRestrictedUrl());
@@ -105,6 +106,10 @@ export const App: React.FC = () => {
     window.history.replaceState({}, '', cleanUrl);
     setIsRestricted(false);
   };
+
+  if (isEmbeddedInSelf) {
+    return null;
+  }
 
   if (isRestricted) {
     return <RestrictedPage onGoToHub={handleGoToHub} />;

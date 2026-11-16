@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TrendingUp, ShieldCheck, Sparkles, ArrowUpRight, Lock, LogOut, Briefcase, BadgeCheck, LayoutGrid } from 'lucide-react';
+import { TrendingUp, ShieldCheck, Sparkles, ArrowUpRight, Lock, LogOut, Briefcase, BadgeCheck } from 'lucide-react';
 import { User, AppItem } from '../types';
 import { supabase } from '../config/supabaseClient';
 import wmdLogo from '../assets/wmd-logo.jpg';
@@ -162,11 +162,14 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     setIsAppLoading(false);
     try {
       const frameLocation = iframeRef.current?.contentWindow?.location;
-      if (frameLocation && frameLocation.origin === window.location.origin) {
+      if (!frameLocation) return;
+      const mainPath = window.location.pathname.replace(/\/+$/, '') || '/';
+      const framePath = frameLocation.pathname.replace(/\/+$/, '') || '/';
+      if (frameLocation.origin === window.location.origin && framePath === mainPath) {
         closeActiveApp(false);
       }
     } catch {
-      // Cross-origin frame is expected once the child app loads.
+      // Cross-origin frame is expected for apps hosted on another origin.
     }
   };
 
