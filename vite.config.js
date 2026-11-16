@@ -67,7 +67,7 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: 'WMD Hub — West Malayan',
+        name: 'WMD Hub',
         short_name: 'WMD Hub',
         description: 'WMD Hub — West Malayan Portal',
         theme_color: '#09234e',
