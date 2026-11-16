@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TrendingUp, ShieldCheck, Sparkles, ArrowUpRight, Lock, LogOut, Briefcase, BadgeCheck } from 'lucide-react';
+import { TrendingUp, ShieldCheck, Sparkles, ArrowUpRight, Lock, LogOut, Briefcase, BadgeCheck, Bell, BellOff } from 'lucide-react';
 import { User, AppItem } from '../types';
 import { supabase } from '../config/supabaseClient';
+import {
+  getPushStatus,
+  enablePushNotifications,
+  disablePushNotifications,
+  PushStatus,
+} from '../utils/pushNotifications';
 import wmdLogo from '../assets/wmd-logo.jpg';
 import '../styles/portal-hub.css';
 
@@ -82,8 +88,14 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     url: string;
   } | null>(null);
   const [isAppLoading, setIsAppLoading] = useState(false);
+  const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
+  const [isPushBusy, setIsPushBusy] = useState(false);
+  const [pushBanner, setPushBanner] = useState<{ type: 'info' | 'error'; text: string } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const activeSignatureRef = useRef<string | null>(null);
+  const pendingLaunchAppIdRef = useRef<string | null>(
+    new URLSearchParams(window.location.search).get('app')
+  );
 
   const buildAuthenticatedAppUrl = useCallback(
     (targetUrl: string): string => {
@@ -247,7 +259,7 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     }
   };
 
-  const handleLaunch = async (app: AppItem) => {
+  const handleLaunch = useCallback(async (app: AppItem) => {
     if (!checkAppAccess(app)) return;
     const targetUrl = await resolveLaunchUrl(app.url);
 
@@ -266,6 +278,75 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     window.history.pushState({ wmdActiveApp: app.id }, '');
     setIsAppLoading(true);
     setActiveApp({ app, baseUrl: targetUrl, url: destinationUrl });
+  }, [apps, buildAuthenticatedAppUrl, currentUser]);
+
+  // Sync push notification status on login / mount
+  useEffect(() => {
+    let cancelled = false;
+    getPushStatus(currentUser.id).then((status) => {
+      if (!cancelled) setPushStatus(status);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser.id]);
+
+  // Open target app when launched from a notification tap (?app=manager or SW postMessage)
+  useEffect(() => {
+    const appId = pendingLaunchAppIdRef.current;
+    if (!appId) return;
+    const target = apps.find((a) => a.id === appId);
+    if (!target) return;
+
+    pendingLaunchAppIdRef.current = null;
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('app');
+    window.history.replaceState({}, '', cleanUrl.toString());
+    void handleLaunch(target);
+  }, [apps, handleLaunch]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'WMD_OPEN_APP_FROM_NOTIFICATION') {
+        const appId = event.data.appId || 'manager';
+        const target = apps.find((a) => a.id === appId);
+        if (target) {
+          void handleLaunch(target);
+        }
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+    };
+  }, [apps, handleLaunch]);
+
+  const handleTogglePush = async () => {
+    if (isPushBusy) return;
+    setIsPushBusy(true);
+    setPushBanner(null);
+
+    try {
+      if (pushStatus?.isSubscribed) {
+        const res = await disablePushNotifications(currentUser.id);
+        setPushStatus(res.status);
+        setPushBanner({ type: 'info', text: 'Push notifications turned off on this device.' });
+      } else {
+        const res = await enablePushNotifications(currentUser.id);
+        setPushStatus(res.status);
+        if (res.ok) {
+          setPushBanner({
+            type: 'info',
+            text: 'Push notifications enabled! Alerts will pop up even when WMD Hub is closed.',
+          });
+        } else if (res.message) {
+          setPushBanner({ type: 'error', text: res.message });
+        }
+      }
+    } finally {
+      setIsPushBusy(false);
+    }
   };
 
   const handleIframeLoad = () => {
@@ -297,6 +378,30 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
           </div>
 
           <div className="hub-topbar-actions">
+            <button
+              type="button"
+              onClick={handleTogglePush}
+              disabled={isPushBusy}
+              className={`hub-notify-btn ${pushStatus?.isSubscribed ? 'is-enabled' : ''}`}
+              title={
+                pushStatus?.isSubscribed
+                  ? 'Notifications enabled on this device (click to disable)'
+                  : 'Enable push notifications on this device'
+              }
+            >
+              {pushStatus?.isSubscribed ? (
+                <Bell className="hub-notify-icon" />
+              ) : (
+                <BellOff className="hub-notify-icon" />
+              )}
+              <span className="hub-notify-label">
+                {isPushBusy
+                  ? 'Saving…'
+                  : pushStatus?.isSubscribed
+                    ? 'Alerts On'
+                    : 'Enable Alerts'}
+              </span>
+            </button>
             <button type="button" onClick={onLogout} className="hub-signout-btn">
               <LogOut className="hub-signout-icon" />
               <span className="hub-signout-label">Sign Out</span>
@@ -306,6 +411,20 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
             </div>
           </div>
         </header>
+
+        {pushBanner && (
+          <div className={`hub-push-banner ${pushBanner.type === 'error' ? 'is-error' : 'is-info'}`}>
+            <span>{pushBanner.text}</span>
+            <button
+              type="button"
+              className="hub-push-banner-close"
+              onClick={() => setPushBanner(null)}
+              aria-label="Dismiss message"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Greeting Banner */}
         <section className="hub-greeting-card">

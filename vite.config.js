@@ -34,37 +34,14 @@ export default defineConfig({
     react(),
     versionManifestPlugin(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       injectRegister: false,
-      workbox: {
-        cacheId: `wmd-hub-${buildVersion}`,
-        skipWaiting: true,
-        clientsClaim: true,
-        cleanupOutdatedCaches: true,
+      injectManifest: {
         // Only precache static icons/manifest so HTML/JS/CSS are never stuck in a Cache-First precache
         globPatterns: ['**/*.{png,jpg,jpeg,svg,ico,webmanifest}'],
-        navigateFallback: null,
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) =>
-              request.mode === 'navigate' ||
-              request.destination === 'document' ||
-              request.destination === 'script' ||
-              request.destination === 'style',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'wmd-app-runtime',
-              networkTimeoutSeconds: 3,
-              fetchOptions: {
-                cache: 'no-store',
-              },
-              expiration: {
-                maxEntries: 30,
-                maxAgeSeconds: 7 * 24 * 60 * 60,
-              },
-            },
-          },
-        ],
       },
       manifest: {
         name: 'WMD Hub',
