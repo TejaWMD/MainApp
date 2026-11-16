@@ -12,15 +12,6 @@ interface PortalHubProps {
 
 const DEFAULT_APPS: AppItem[] = [
   {
-    id: 'sales',
-    name: 'Sales & Collection Dashboard',
-    url: 'https://tejawmd.github.io/SalesDashboard/',
-    badge: 'Sales & Collection',
-    color: '#1080a7',
-    allowed_roles: ['admin', 'manager', 'account_manager'],
-    allowed_departments: ['Sales', 'All'],
-  },
-  {
     id: 'manager',
     name: 'Query Portal',
     url: 'https://tejawmd.github.io/ManagerDashboard/',
@@ -31,13 +22,22 @@ const DEFAULT_APPS: AppItem[] = [
   },
   {
     id: 'prediction',
-    name: 'Sales prediction',
+    name: 'Sales Prediction',
     url: 'https://wmgteja.github.io/PredictionSales/',
     badge: 'Forecasting',
     color: '#83121c',
     allowed_roles: ['admin'],
     allowed_departments: ['All', 'Sales'],
   },
+  {
+    id: 'sales',
+    name: 'Sales & Collection',
+    url: 'https://tejawmd.github.io/SalesDashboard/',
+    badge: 'Sales & Collection',
+    color: '#1080a7',
+    allowed_roles: ['admin', 'manager', 'account_manager'],
+    allowed_departments: ['Sales', 'All'],
+  }
 ];
 
 const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
