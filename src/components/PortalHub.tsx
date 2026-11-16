@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, ShieldCheck, Sparkles, ArrowUpRight, Lock, LogOut, Briefcase, BadgeCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { TrendingUp, ShieldCheck, Sparkles, ArrowUpRight, Lock, LogOut, Briefcase, BadgeCheck, LayoutGrid } from 'lucide-react';
 import { User, AppItem } from '../types';
 import { supabase } from '../config/supabaseClient';
 import wmdLogo from '../assets/wmd-logo.jpg';
@@ -48,6 +48,43 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
 
 export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) => {
   const [apps, setApps] = useState<AppItem[]>(DEFAULT_APPS);
+  const [activeApp, setActiveApp] = useState<{ app: AppItem; url: string } | null>(null);
+  const [isAppLoading, setIsAppLoading] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  const closeActiveApp = useCallback((fromPopState = false) => {
+    setActiveApp(null);
+    setIsAppLoading(false);
+    if (!fromPopState && window.history.state?.wmdActiveApp) {
+      window.history.back();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (activeApp) {
+        closeActiveApp(true);
+      }
+    };
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'WMD_RETURN_TO_HUB') {
+        if (event.data.restricted) {
+          window.location.search = '?restricted=true';
+          return;
+        }
+        closeActiveApp(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [activeApp, closeActiveApp]);
 
   useEffect(() => {
     async function loadApps() {
@@ -113,7 +150,24 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     const ssoToken = btoa(encodeURIComponent(JSON.stringify(ssoPayload)));
     const separator = targetUrl.includes('?') ? '&' : '?';
     const destinationUrl = `${targetUrl}${separator}sso_token=${encodeURIComponent(ssoToken)}`;
-    window.location.href = destinationUrl;
+
+    // Open inside the PWA's own full-screen shell so mobile OS browsers
+    // do not show an external URL bar / close-banner sheet.
+    window.history.pushState({ wmdActiveApp: app.id }, '');
+    setIsAppLoading(true);
+    setActiveApp({ app, url: destinationUrl });
+  };
+
+  const handleIframeLoad = () => {
+    setIsAppLoading(false);
+    try {
+      const frameLocation = iframeRef.current?.contentWindow?.location;
+      if (frameLocation && frameLocation.origin === window.location.origin) {
+        closeActiveApp(false);
+      }
+    } catch {
+      // Cross-origin frame is expected once the child app loads.
+    }
   };
 
   const accessibleCount = apps.filter(checkAppAccess).length;
@@ -225,6 +279,29 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
           })}
         </section>
       </div>
+
+      {activeApp && (
+        <div className="app-shell-overlay" role="dialog" aria-label={activeApp.app.name}>
+          {isAppLoading && (
+            <div className="app-shell-loader">
+              <img src={wmdLogo} alt="WMD Hub" className="app-shell-loader-logo" />
+              <div className="app-shell-spinner" aria-hidden="true" />
+              <p className="app-shell-loader-text">Opening {activeApp.app.name}…</p>
+            </div>
+          )}
+
+          <iframe
+            ref={iframeRef}
+            src={activeApp.url}
+            title={activeApp.app.name}
+            className="app-shell-iframe"
+            allow="clipboard-read; clipboard-write; fullscreen; geolocation; camera; microphone"
+            onLoad={handleIframeLoad}
+          />
+
+          
+        </div>
+      )}
     </div>
   );
 };

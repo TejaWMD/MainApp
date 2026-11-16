@@ -37,4 +37,5 @@ body {
     var(--wmd-bg);
   background-attachment: fixed;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
 }

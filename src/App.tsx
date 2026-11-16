@@ -31,6 +31,17 @@ export const App: React.FC = () => {
 
   const [isRestricted, setIsRestricted] = useState<boolean>(checkIsRestrictedUrl);
 
+  // If a child app inside the embedded iframe navigates back to portal_url,
+  // notify the parent MainApp shell to close the iframe instead of nesting MainApp.
+  useEffect(() => {
+    if (window.self !== window.top) {
+      window.parent.postMessage(
+        { type: 'WMD_RETURN_TO_HUB', restricted: checkIsRestrictedUrl() },
+        window.location.origin
+      );
+    }
+  }, []);
+
   useEffect(() => {
     const syncRestricted = () => setIsRestricted(checkIsRestrictedUrl());
     window.addEventListener('popstate', syncRestricted);
