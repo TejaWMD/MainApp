@@ -9,12 +9,13 @@ interface AddUserModalProps {
 }
 
 const ROLES_LIST: { role: Role; label: string }[] = [
+  { role: 'staff', label: 'Staff' },
   { role: 'account_manager', label: 'Account Manager' },
   { role: 'manager', label: 'Manager' },
   { role: 'admin', label: 'Admin' },
 ];
 
-const DEPARTMENTS_LIST = ['Sales', 'Logistics', 'Fin & Acc', 'QAQC', 'HR', 'All'];
+const DEPARTMENTS_LIST = ['Sales', 'Logistics', 'Fin & Acc', 'QAQC', 'Purchase', 'HR', 'All'];
 
 export const AddUserModal: React.FC<AddUserModalProps> = ({
   isOpen,
@@ -45,13 +46,19 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
     // Default accessible apps based on role & dept
     const accessibleApps =
       role === 'admin'
-        ? ['sales', 'manager', 'prediction']
+        ? ['sales', 'manager', 'prediction', 'qaqc']
+        : role === 'staff'
+        ? department === 'QAQC'
+          ? ['qaqc']
+          : []
         : department === 'Sales'
         ? ['sales', 'manager']
+        : department === 'QAQC'
+        ? ['manager', 'qaqc']
         : ['manager'];
 
     const newUser: User = {
-      id: `${role === 'admin' ? 'adm' : role === 'manager' ? 'mgr' : 'am'}-${Date.now().toString().slice(-4)}`,
+      id: `${role === 'admin' ? 'adm' : role === 'manager' ? 'mgr' : role === 'staff' ? 'stf' : 'am'}-${Date.now().toString().slice(-4)}`,
       name,
       email: email.trim().toLowerCase(),
       password: password.trim(),

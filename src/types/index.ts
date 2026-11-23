@@ -1,10 +1,11 @@
-export type Role = 'admin' | 'manager' | 'account_manager';
+export type Role = 'admin' | 'manager' | 'account_manager' | 'staff';
 
 export type Department = 
   | 'Sales' 
   | 'Logistics' 
   | 'Fin & Acc' 
   | 'QAQC' 
+  | 'Purchase'
   | 'HR' 
   | 'All';
 
@@ -28,6 +29,7 @@ export interface User {
 export interface AppItem {
   id: string;
   name: string;
+  subtitle?: string;
   url: string;
   badge: string;
   color: string;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TrendingUp, ShieldCheck, Sparkles, ArrowUpRight, Lock, LogOut, Briefcase, BadgeCheck, Bell, BellOff } from 'lucide-react';
+import { TrendingUp, ShieldCheck, Sparkles, ClipboardCheck, ArrowUpRight, Lock, LogOut, Briefcase, BadgeCheck, Bell, BellOff } from 'lucide-react';
 import { User, AppItem } from '../types';
 import { supabase } from '../config/supabaseClient';
 import {
@@ -43,6 +43,16 @@ const DEFAULT_APPS: AppItem[] = [
     color: '#1080a7',
     allowed_roles: ['admin', 'manager', 'account_manager'],
     allowed_departments: ['Sales', 'All'],
+  },
+  {
+    id: 'qaqc',
+    name: 'QAQC Web',
+    subtitle: 'Factory QA/QC, Production & WMS Portal',
+    url: 'https://tejawmd.github.io/QAQCWeb/',
+    badge: 'QAQC & ERP',
+    color: '#0f766e',
+    allowed_roles: ['admin'],
+    allowed_departments: ['All'],
   }
 ];
 
@@ -50,6 +60,7 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   sales: TrendingUp,
   manager: ShieldCheck,
   prediction: Sparkles,
+  qaqc: ClipboardCheck,
 };
 
 async function fetchChildSiteSignature(baseUrl: string): Promise<string | null> {
