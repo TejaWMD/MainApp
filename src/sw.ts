@@ -150,7 +150,7 @@ sw.addEventListener('push', (event: SwPushEvent) => {
   const defaultIcon = new URL('pwa-192x192.png', sw.registration.scope).href;
 
   let payload: Record<string, any> = {
-    title: 'WMD Query Portal',
+    title: 'WMD Hub',
     body: 'New notification received',
     icon: defaultIcon,
     badge: defaultIcon,
@@ -167,6 +167,13 @@ sw.addEventListener('push', (event: SwPushEvent) => {
     }
   }
 
+  const incomingData =
+    typeof payload.data === 'object' && payload.data
+      ? (payload.data as Record<string, unknown>)
+      : {};
+  const targetAppId = String(incomingData.appId || 'manager').trim() || 'manager';
+  const openActionTitle = targetAppId === 'qaqc' ? 'Open QAQC Web' : 'Open Portal';
+
   const notificationOptions: NotificationOptions & {
     vibrate?: number[];
     renotify?: boolean;
@@ -177,30 +184,32 @@ sw.addEventListener('push', (event: SwPushEvent) => {
     badge: defaultIcon,
     tag: String(payload.tag || `wmd-alert-${Date.now()}`),
     data: {
-      ...(typeof payload.data === 'object' && payload.data ? payload.data : {}),
-      appId: 'manager',
+      ...incomingData,
+      appId: targetAppId,
     },
     vibrate: [250, 100, 250, 100, 250],
     requireInteraction: true,
     renotify: true,
     silent: false,
     actions: [
-      { action: 'open', title: 'Open Portal' },
+      { action: 'open', title: openActionTitle },
       { action: 'dismiss', title: 'Dismiss' },
     ],
   };
 
   event.waitUntil(
     (async () => {
-      const suppress = await shouldSuppressUrgentNotification(
-        payload.title,
-        notificationOptions.tag,
-        notificationOptions.data as Record<string, unknown> | undefined
-      );
-      if (suppress) return;
+      if (targetAppId === 'manager') {
+        const suppress = await shouldSuppressUrgentNotification(
+          payload.title,
+          notificationOptions.tag,
+          notificationOptions.data as Record<string, unknown> | undefined
+        );
+        if (suppress) return;
+      }
 
       await sw.registration.showNotification(
-        String(payload.title || 'WMD Query Portal'),
+        String(payload.title || 'WMD Hub'),
         notificationOptions
       );
     })()
@@ -214,7 +223,15 @@ sw.addEventListener('notificationclick', (event: SwNotificationEvent) => {
     return;
   }
 
-  const launchUrl = new URL('./?app=manager', sw.registration.scope).href;
+  const notifData = (event.notification.data || {}) as Record<string, unknown>;
+  const targetAppId = String(notifData.appId || 'manager').trim() || 'manager';
+  const targetPath = typeof notifData.path === 'string' ? notifData.path.trim() : '';
+
+  const launchParams = new URLSearchParams({ app: targetAppId });
+  if (targetPath) {
+    launchParams.set('path', targetPath);
+  }
+  const launchUrl = new URL(`./?${launchParams.toString()}`, sw.registration.scope).href;
 
   event.waitUntil(
     sw.clients
@@ -224,8 +241,9 @@ sw.addEventListener('notificationclick', (event: SwNotificationEvent) => {
           if (client.focus) {
             client.postMessage({
               type: 'WMD_OPEN_APP_FROM_NOTIFICATION',
-              appId: 'manager',
-              data: event.notification.data,
+              appId: targetAppId,
+              path: targetPath || undefined,
+              data: notifData,
             });
             return client.focus();
           }

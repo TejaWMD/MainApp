@@ -107,9 +107,12 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
   const pendingLaunchAppIdRef = useRef<string | null>(
     new URLSearchParams(window.location.search).get('app')
   );
+  const pendingLaunchPathRef = useRef<string | null>(
+    new URLSearchParams(window.location.search).get('path')
+  );
 
   const buildAuthenticatedAppUrl = useCallback(
-    (targetUrl: string): string => {
+    (targetUrl: string, hashPath?: string | null): string => {
       const ssoPayload = {
         id: currentUser.id,
         email: currentUser.email,
@@ -123,8 +126,14 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
         issued_at: Date.now(),
       };
       const ssoToken = btoa(encodeURIComponent(JSON.stringify(ssoPayload)));
-      const separator = targetUrl.includes('?') ? '&' : '?';
-      return `${targetUrl}${separator}sso_token=${encodeURIComponent(ssoToken)}&_v=${Date.now()}`;
+      const [baseWithoutHash, existingHash] = targetUrl.split('#');
+      const separator = baseWithoutHash.includes('?') ? '&' : '?';
+      const normalizedHash = hashPath
+        ? `#${hashPath.startsWith('/') ? hashPath : `/${hashPath}`}`
+        : existingHash
+          ? `#${existingHash}`
+          : '';
+      return `${baseWithoutHash}${separator}sso_token=${encodeURIComponent(ssoToken)}&_v=${Date.now()}${normalizedHash}`;
     },
     [currentUser]
   );
@@ -270,7 +279,7 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     }
   };
 
-  const handleLaunch = useCallback(async (app: AppItem) => {
+  const handleLaunch = useCallback(async (app: AppItem, hashPath?: string | null) => {
     if (!checkAppAccess(app)) return;
     const targetUrl = await resolveLaunchUrl(app.url);
 
@@ -281,7 +290,7 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
       // Ignore network errors
     }
 
-    const destinationUrl = buildAuthenticatedAppUrl(targetUrl);
+    const destinationUrl = buildAuthenticatedAppUrl(targetUrl, hashPath);
     activeSignatureRef.current = null;
 
     // Open inside the PWA's own full-screen shell so mobile OS browsers
@@ -302,18 +311,21 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     };
   }, [currentUser.id]);
 
-  // Open target app when launched from a notification tap (?app=manager or SW postMessage)
+  // Open target app when launched from a notification tap (?app=manager or ?app=qaqc&path=/downtime)
   useEffect(() => {
     const appId = pendingLaunchAppIdRef.current;
     if (!appId) return;
     const target = apps.find((a) => a.id === appId);
     if (!target) return;
 
+    const hashPath = pendingLaunchPathRef.current;
     pendingLaunchAppIdRef.current = null;
+    pendingLaunchPathRef.current = null;
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('app');
+    cleanUrl.searchParams.delete('path');
     window.history.replaceState({}, '', cleanUrl.toString());
-    void handleLaunch(target);
+    void handleLaunch(target, hashPath);
   }, [apps, handleLaunch]);
 
   useEffect(() => {
@@ -321,9 +333,10 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     const handleSwMessage = (event: MessageEvent) => {
       if (event.data?.type === 'WMD_OPEN_APP_FROM_NOTIFICATION') {
         const appId = event.data.appId || 'manager';
+        const hashPath = typeof event.data.path === 'string' ? event.data.path : null;
         const target = apps.find((a) => a.id === appId);
         if (target) {
-          void handleLaunch(target);
+          void handleLaunch(target, hashPath);
         }
       }
     };
