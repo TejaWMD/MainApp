@@ -1,5 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TrendingUp, ShieldCheck, Sparkles, ClipboardCheck, ArrowUpRight, Lock, LogOut, Briefcase, BadgeCheck, Bell, BellOff } from 'lucide-react';
+import {
+  TrendingUp,
+  ShieldCheck,
+  ShoppingCart,
+  ClipboardCheck,
+  ArrowUpRight,
+  Lock,
+  LogOut,
+  Briefcase,
+  BadgeCheck,
+  Bell,
+  BellOff,
+  Users,
+  LayoutGrid,
+} from 'lucide-react';
 import { User, AppItem } from '../types';
 import { supabase } from '../config/supabaseClient';
 import {
@@ -8,6 +22,12 @@ import {
   disablePushNotifications,
   PushStatus,
 } from '../utils/pushNotifications';
+import {
+  upsertUserAndSync,
+  toggleUserStatusAndSync,
+  resyncUserToApps,
+} from '../utils/userSync';
+import { UserManagement } from './UserManagement';
 import wmdLogo from '../assets/wmd-logo.jpg';
 import '../styles/portal-hub.css';
 
@@ -27,13 +47,23 @@ const DEFAULT_APPS: AppItem[] = [
     allowed_departments: ['Sales', 'Logistics', 'Fin & Acc', 'QAQC', 'HR', 'All'],
   },
   {
-    id: 'prediction',
-    name: 'Sales Prediction',
+    id: 'purchase',
+    name: 'Purchase',
     url: 'https://wmgteja.github.io/PredictionSales/',
-    badge: 'Forecasting',
+    badge: 'Purchase',
     color: '#83121c',
     allowed_roles: ['admin'],
-    allowed_departments: ['All', 'Sales'],
+    allowed_departments: ['All', 'Purchase'],
+  },
+    {
+    id: 'qaqc',
+    name: 'Factory (QAQC)',
+    subtitle: 'Factory QA/QC',
+    url: 'https://tejawmd.github.io/QAQCWeb/',
+    badge: 'QAQC',
+    color: '#0f766e',
+    allowed_roles: ['admin'],
+    allowed_departments: ['All'],
   },
   {
     id: 'sales',
@@ -43,25 +73,46 @@ const DEFAULT_APPS: AppItem[] = [
     color: '#1080a7',
     allowed_roles: ['admin', 'manager', 'account_manager'],
     allowed_departments: ['Sales', 'All'],
-  },
-  {
-    id: 'qaqc',
-    name: 'QAQC Web',
-    subtitle: 'Factory QA/QC, Production & WMS Portal',
-    url: 'https://tejawmd.github.io/QAQCWeb/',
-    badge: 'QAQC & ERP',
-    color: '#0f766e',
-    allowed_roles: ['admin'],
-    allowed_departments: ['All'],
   }
 ];
 
 const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   sales: TrendingUp,
   manager: ShieldCheck,
-  prediction: Sparkles,
+  purchase: ShoppingCart,
+  prediction: ShoppingCart,
   qaqc: ClipboardCheck,
 };
+
+const APP_DISPLAY_ORDER = ['manager', 'purchase', 'qaqc', 'sales'];
+
+function sortAppsForDisplay(items: AppItem[]): AppItem[] {
+  return [...items].sort((a, b) => {
+    const idxA = APP_DISPLAY_ORDER.indexOf(a.id);
+    const idxB = APP_DISPLAY_ORDER.indexOf(b.id);
+    const rankA = idxA === -1 ? APP_DISPLAY_ORDER.length : idxA;
+    const rankB = idxB === -1 ? APP_DISPLAY_ORDER.length : idxB;
+    return rankA - rankB;
+  });
+}
+
+function normalizeAppRecord(app: AppItem): AppItem {
+  if (app.id === 'prediction' || app.id === 'purchase') {
+    return {
+      ...app,
+      id: 'purchase',
+      name: 'Purchase',
+      badge: app.badge === 'Forecasting' ? 'Purchase' : app.badge || 'Purchase',
+    };
+  }
+  if (app.id === 'qaqc') {
+    return {
+      ...app,
+      name: 'Factory (QAQC)',
+    };
+  }
+  return app;
+}
 
 async function fetchChildSiteSignature(baseUrl: string): Promise<string | null> {
   if (!navigator.onLine) return null;
@@ -91,7 +142,15 @@ async function fetchChildSiteSignature(baseUrl: string): Promise<string | null> 
   }
 }
 
+const TEAM_ACCESS_OWNER_EMAIL = 'wmgteja@gmail.com';
+
 export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) => {
+  const canManageTeam =
+    currentUser.role === 'admin' &&
+    currentUser.email.trim().toLowerCase() === TEAM_ACCESS_OWNER_EMAIL;
+  const [activeView, setActiveView] = useState<'hub' | 'users'>('hub');
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [apps, setApps] = useState<AppItem[]>(DEFAULT_APPS);
   const [activeApp, setActiveApp] = useState<{
     app: AppItem;
@@ -240,7 +299,13 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
           .from('apps')
           .select('*')
           .eq('is_active', true);
-        if (!error && data && data.length > 0) setApps(data as AppItem[]);
+        if (!error && data && data.length > 0) {
+          const normalized = (data as AppItem[]).map(normalizeAppRecord);
+          const deduped = Array.from(
+            new Map(normalized.map((item) => [item.id, item])).values()
+          );
+          setApps(sortAppsForDisplay(deduped));
+        }
       } catch (err) {
         console.warn('Could not load apps from Supabase, using defaults', err);
       }
@@ -248,14 +313,65 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     loadApps();
   }, []);
 
+  const loadAllUsers = useCallback(async () => {
+    if (!canManageTeam) return;
+    setIsLoadingUsers(true);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (!error && data) {
+        setAllUsers(data as User[]);
+      }
+    } catch (err) {
+      console.warn('Could not load users from Supabase', err);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  }, [canManageTeam]);
+
+  useEffect(() => {
+    if (canManageTeam && activeView === 'users') {
+      void loadAllUsers();
+    }
+  }, [canManageTeam, activeView, loadAllUsers]);
+
+  const handleSaveUser = async (user: User) => {
+    const res = await upsertUserAndSync(currentUser, user);
+    if (res.ok) {
+      await loadAllUsers();
+    }
+    return res;
+  };
+
+  const handleToggleUserStatus = async (userId: string) => {
+    const res = await toggleUserStatusAndSync(currentUser, userId);
+    if (res.ok) {
+      await loadAllUsers();
+    }
+    return res;
+  };
+
+  const handleResyncUser = async (userId: string) => {
+    const res = await resyncUserToApps(currentUser, userId);
+    if (res.ok) {
+      await loadAllUsers();
+    }
+    return res;
+  };
+
   const checkAppAccess = (app: AppItem): boolean => {
     if (currentUser.role === 'admin') return true;
-    if (currentUser.accessible_apps && currentUser.accessible_apps.includes(app.id)) return true;
-    const roleMatch = app.allowed_roles?.includes(currentUser.role);
-    const deptMatch =
-      currentUser.department === 'All' ||
-      app.allowed_departments?.includes(currentUser.department);
-    return Boolean(roleMatch && deptMatch);
+    // ManagerDashboard (Query Portal) is strictly not for staff
+    if (app.id === 'manager' && currentUser.role === 'staff') return false;
+    const userApps = Array.isArray(currentUser.accessible_apps)
+      ? currentUser.accessible_apps
+      : [];
+    if (userApps.includes(app.id)) return true;
+    // Backward-compatibility during transition if DB still has 'prediction'
+    if (app.id === 'purchase' && userApps.includes('prediction')) return true;
+    return false;
   };
 
   const resolveLaunchUrl = async (defaultUrl: string): Promise<string> => {
@@ -414,6 +530,27 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
           </div>
 
           <div className="hub-topbar-actions">
+            {canManageTeam && (
+              <button
+                type="button"
+                onClick={() => setActiveView((prev) => (prev === 'users' ? 'hub' : 'users'))}
+                className={`hub-notify-btn ${activeView === 'users' ? 'is-enabled' : ''}`}
+                title={
+                  activeView === 'users'
+                    ? 'Back to Workspaces Hub'
+                    : 'Manage Team Members & Website Access'
+                }
+              >
+                {activeView === 'users' ? (
+                  <LayoutGrid className="hub-notify-icon" />
+                ) : (
+                  <Users className="hub-notify-icon" />
+                )}
+                <span className="hub-notify-label">
+                  {activeView === 'users' ? 'Workspaces' : 'Team & Access'}
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleTogglePush}
@@ -462,90 +599,102 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
           </div>
         )}
 
-        {/* Greeting Banner */}
-        <section className="hub-greeting-card">
-          <div className="hub-greeting-inner">
-            <p className="hub-greeting-eyebrow">Welcome back</p>
-            <h2 className="hub-title">
-              Hello, <span className="hub-title-accent">{currentUser.name}</span>
-            </h2>
-          </div>
+        {canManageTeam && activeView === 'users' ? (
+          <UserManagement
+            users={allUsers}
+            isLoading={isLoadingUsers}
+            onSaveUser={handleSaveUser}
+            onToggleStatus={handleToggleUserStatus}
+            onResyncUser={handleResyncUser}
+          />
+        ) : (
+          <>
+            {/* Greeting Banner */}
+            <section className="hub-greeting-card">
+              <div className="hub-greeting-inner">
+                <p className="hub-greeting-eyebrow">Welcome back</p>
+                <h2 className="hub-title">
+                  Hello, <span className="hub-title-accent">{currentUser.name}</span>
+                </h2>
+              </div>
 
-          <div className="hub-greeting-badges">
-            <span className="hub-badge hub-badge-role">
-              <BadgeCheck className="hub-badge-icon" />
-              <span>{currentUser.role_label || currentUser.role}</span>
-            </span>
-            <span className="hub-badge hub-badge-dept">
-              <Briefcase className="hub-badge-icon" />
-              <span>{currentUser.department}</span>
-            </span>
-          </div>
-        </section>
+              <div className="hub-greeting-badges">
+                <span className="hub-badge hub-badge-role">
+                  <BadgeCheck className="hub-badge-icon" />
+                  <span>{currentUser.role_label || currentUser.role}</span>
+                </span>
+                <span className="hub-badge hub-badge-dept">
+                  <Briefcase className="hub-badge-icon" />
+                  <span>{currentUser.department}</span>
+                </span>
+              </div>
+            </section>
 
-        {/* Apps Header */}
-        <div className="hub-apps-header">
-          <h3 className="hub-apps-title">Your Workspaces</h3>
-          <span className="hub-apps-count">{accessibleCount} available</span>
-        </div>
+            {/* Apps Header */}
+            <div className="hub-apps-header">
+              <h3 className="hub-apps-title">Your Workspaces</h3>
+              <span className="hub-apps-count">{accessibleCount} available</span>
+            </div>
 
-        {/* Workspace Grid */}
-        <section className="hub-card-grid" aria-label="Workspaces">
-          {apps.map((app) => {
-            const Icon = ICON_MAP[app.id] || Sparkles;
-            const hasAccess = checkAppAccess(app);
+            {/* Workspace Grid */}
+            <section className="hub-card-grid" aria-label="Workspaces">
+              {apps.map((app) => {
+                const Icon = ICON_MAP[app.id] || ShoppingCart;
+                const hasAccess = checkAppAccess(app);
 
-            return (
-              <button
-                key={app.id}
-                type="button"
-                onClick={() => handleLaunch(app)}
-                disabled={!hasAccess}
-                className="hub-workspace-card group"
-                style={{
-                  opacity: hasAccess ? 1 : 0.6,
-                  cursor: hasAccess ? 'pointer' : 'not-allowed',
-                }}
-              >
-                <div className="hub-card-top">
-                  <div className="hub-card-icon-box" style={{ backgroundColor: app.color }}>
-                    <Icon className="hub-card-icon" />
-                  </div>
-                  <span
-                    className="hub-card-tag"
+                return (
+                  <button
+                    key={app.id}
+                    type="button"
+                    onClick={() => handleLaunch(app)}
+                    disabled={!hasAccess}
+                    className="hub-workspace-card group"
                     style={{
-                      backgroundColor: `${app.color}18`,
-                      color: app.color,
-                      border: `1px solid ${app.color}38`,
+                      opacity: hasAccess ? 1 : 0.6,
+                      cursor: hasAccess ? 'pointer' : 'not-allowed',
                     }}
                   >
-                    {app.badge}
-                  </span>
-                </div>
-
-                <div className="hub-card-body">
-                  <h3 className="hub-card-name">{app.name}</h3>
-                </div>
-
-                <div className="hub-card-footer">
-                  {hasAccess ? (
-                    <>
-                      <span className="hub-card-cta">Open</span>
-                      <div className="hub-circle-arrow" style={{ backgroundColor: app.color }}>
-                        <ArrowUpRight className="hub-circle-arrow-icon" />
+                    <div className="hub-card-top">
+                      <div className="hub-card-icon-box" style={{ backgroundColor: app.color }}>
+                        <Icon className="hub-card-icon" />
                       </div>
-                    </>
-                  ) : (
-                    <div className="hub-card-restricted">
-                      <Lock className="hub-card-restricted-icon" />
-                      <span>Restricted</span>
+                      <span
+                        className="hub-card-tag"
+                        style={{
+                          backgroundColor: `${app.color}18`,
+                          color: app.color,
+                          border: `1px solid ${app.color}38`,
+                        }}
+                      >
+                        {app.badge}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </section>
+
+                    <div className="hub-card-body">
+                      <h3 className="hub-card-name">{app.name}</h3>
+                    </div>
+
+                    <div className="hub-card-footer">
+                      {hasAccess ? (
+                        <>
+                          <span className="hub-card-cta">Open</span>
+                          <div className="hub-circle-arrow" style={{ backgroundColor: app.color }}>
+                            <ArrowUpRight className="hub-circle-arrow-icon" />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="hub-card-restricted">
+                          <Lock className="hub-card-restricted-icon" />
+                          <span>Restricted</span>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </section>
+          </>
+        )}
       </div>
 
       {activeApp && (
