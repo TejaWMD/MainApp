@@ -4,6 +4,10 @@ const MANAGER_SUPABASE_URL = 'https://mjrqamakqqsqqmuvaqpw.supabase.co';
 const MANAGER_SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qcnFhbWFrcXFzcXFtdXZhcXB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0NjQyOTgsImV4cCI6MjEwODA0MDI5OH0.5VWlGTl87khT4JHlLLoT8IAwmceToyNZcN2EjfDohKg';
 
+const QAQC_SUPABASE_URL = 'https://mfeojzfaeyctdtgwldem.supabase.co';
+const QAQC_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mZW9qemZhZXljdGR0Z3dsZGVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ4NzgwNTksImV4cCI6MjExMDQ1NDA1OX0.M07IpoxwWEJiFZiPMPzLlfn0vR8hclPzrB7iceFS1t8';
+
 const VAPID_PUBLIC_KEY =
   'BCEB9PkPPBOooUYwvmg1UZalOVO10DVdzsdCcKAoHFyARTSRsSjFogXcLzF0KSbLv6Z4IW548ttA0vCBfmMExqI';
 
@@ -14,6 +18,21 @@ const managerSupabase = createClient(MANAGER_SUPABASE_URL, MANAGER_SUPABASE_ANON
     detectSessionInUrl: false,
   },
 });
+
+const qaqcSupabase = createClient(QAQC_SUPABASE_URL, QAQC_SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+});
+
+export interface PushTargetContext {
+  userId: string;
+  userEmail: string;
+  hasManagerAccess: boolean;
+  hasQaqcAccess: boolean;
+}
 
 export interface PushStatus {
   supported: boolean;
@@ -114,7 +133,82 @@ async function saveSubscriptionToManagerDb(
   return { ok: true };
 }
 
-export async function getPushStatus(userId: string): Promise<PushStatus> {
+async function saveSubscriptionToQaqcDb(
+  userId: string,
+  userEmail: string,
+  sub: PushSubscription
+): Promise<{ ok: boolean; error?: string }> {
+  const cleanEmail = String(userEmail || '').trim().toLowerCase();
+  if (!cleanEmail) return { ok: false, error: 'Missing user email' };
+
+  const p256dh = encodeSubscriptionKey(sub, 'p256dh');
+  const auth = encodeSubscriptionKey(sub, 'auth');
+
+  const { error: upsertError } = await qaqcSupabase
+    .from('qaqc_push_subscriptions')
+    .upsert(
+      {
+        user_email: cleanEmail,
+        user_id: userId,
+        endpoint: sub.endpoint,
+        p256dh,
+        auth,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_email,endpoint' }
+    );
+
+  if (!upsertError) {
+    return { ok: true };
+  }
+
+  await qaqcSupabase
+    .from('qaqc_push_subscriptions')
+    .delete()
+    .match({ user_email: cleanEmail, endpoint: sub.endpoint });
+
+  const { error: insertError } = await qaqcSupabase
+    .from('qaqc_push_subscriptions')
+    .insert([{ user_email: cleanEmail, user_id: userId, endpoint: sub.endpoint, p256dh, auth }]);
+
+  if (insertError) {
+    return { ok: false, error: insertError.message || upsertError.message };
+  }
+
+  return { ok: true };
+}
+
+async function saveSubscriptionsForTargets(
+  ctx: PushTargetContext,
+  sub: PushSubscription
+): Promise<{ ok: boolean; error?: string }> {
+  const results: Array<{ app: string; ok: boolean; error?: string }> = [];
+
+  if (ctx.hasManagerAccess) {
+    const res = await saveSubscriptionToManagerDb(ctx.userId, sub);
+    results.push({ app: 'ManagerDashboard', ...res });
+  }
+
+  if (ctx.hasQaqcAccess) {
+    const res = await saveSubscriptionToQaqcDb(ctx.userId, ctx.userEmail, sub);
+    results.push({ app: 'QAQCWeb', ...res });
+  }
+
+  if (results.length === 0) {
+    return { ok: true };
+  }
+
+  const anySuccess = results.some((r) => r.ok);
+  const errors = results.filter((r) => !r.ok).map((r) => `${r.app}: ${r.error}`);
+
+  if (anySuccess) {
+    return { ok: true };
+  }
+
+  return { ok: false, error: errors.join('; ') };
+}
+
+export async function getPushStatus(ctx: PushTargetContext): Promise<PushStatus> {
   const ios = isIosDevice();
   const standalone = isStandalonePwa();
 
@@ -149,21 +243,42 @@ export async function getPushStatus(userId: string): Promise<PushStatus> {
     };
   }
 
-  // Silently ensure this device's push endpoint is registered in ManagerDashboard's DB
-  try {
-    const { data, error } = await managerSupabase
-      .from('push_subscriptions')
-      .select('endpoint')
-      .eq('user_id', userId);
+  // Silently ensure this device's push endpoint is registered in each app's own DB
+  if (ctx.hasManagerAccess) {
+    try {
+      const { data, error } = await managerSupabase
+        .from('push_subscriptions')
+        .select('endpoint')
+        .eq('user_id', ctx.userId);
 
-    const hasEndpoint =
-      !error && Array.isArray(data) && data.some((row) => row.endpoint === sub.endpoint);
+      const hasEndpoint =
+        !error && Array.isArray(data) && data.some((row) => row.endpoint === sub.endpoint);
 
-    if (!hasEndpoint) {
-      await saveSubscriptionToManagerDb(userId, sub);
+      if (!hasEndpoint) {
+        await saveSubscriptionToManagerDb(ctx.userId, sub);
+      }
+    } catch {
+      // Non-blocking sync
     }
-  } catch {
-    // Non-blocking sync
+  }
+
+  if (ctx.hasQaqcAccess && ctx.userEmail) {
+    try {
+      const cleanEmail = ctx.userEmail.trim().toLowerCase();
+      const { data, error } = await qaqcSupabase
+        .from('qaqc_push_subscriptions')
+        .select('endpoint')
+        .eq('user_email', cleanEmail);
+
+      const hasEndpoint =
+        !error && Array.isArray(data) && data.some((row) => row.endpoint === sub.endpoint);
+
+      if (!hasEndpoint) {
+        await saveSubscriptionToQaqcDb(ctx.userId, cleanEmail, sub);
+      }
+    } catch {
+      // Non-blocking sync
+    }
   }
 
   return {
@@ -175,12 +290,12 @@ export async function getPushStatus(userId: string): Promise<PushStatus> {
 }
 
 export async function enablePushNotifications(
-  userId: string
+  ctx: PushTargetContext
 ): Promise<{ ok: boolean; status: PushStatus; message?: string }> {
   if (isIosDevice() && !isStandalonePwa()) {
     return {
       ok: false,
-      status: await getPushStatus(userId),
+      status: await getPushStatus(ctx),
       message: 'On iPhone/iPad, tap Share -> Add to Home Screen first, then open WMD Hub from your Home Screen.',
     };
   }
@@ -188,7 +303,7 @@ export async function enablePushNotifications(
   if (!isPushSupported()) {
     return {
       ok: false,
-      status: await getPushStatus(userId),
+      status: await getPushStatus(ctx),
       message: 'Push notifications are not supported in this browser (HTTPS required).',
     };
   }
@@ -197,7 +312,7 @@ export async function enablePushNotifications(
   if (permission !== 'granted') {
     return {
       ok: false,
-      status: await getPushStatus(userId),
+      status: await getPushStatus(ctx),
       message:
         permission === 'denied'
           ? 'Notifications are blocked in your browser/device settings.'
@@ -209,7 +324,7 @@ export async function enablePushNotifications(
   if (!reg) {
     return {
       ok: false,
-      status: await getPushStatus(userId),
+      status: await getPushStatus(ctx),
       message: 'Service Worker is not ready yet. Please reload and try again.',
     };
   }
@@ -222,8 +337,8 @@ export async function enablePushNotifications(
     });
   }
 
-  const saved = await saveSubscriptionToManagerDb(userId, sub);
-  const status = await getPushStatus(userId);
+  const saved = await saveSubscriptionsForTargets(ctx, sub);
+  const status = await getPushStatus(ctx);
 
   if (!saved.ok) {
     return {
@@ -237,19 +352,31 @@ export async function enablePushNotifications(
 }
 
 export async function disablePushNotifications(
-  userId: string
+  ctx: PushTargetContext
 ): Promise<{ ok: boolean; status: PushStatus }> {
   const reg = await getSwRegistration();
   const sub = reg ? await reg.pushManager.getSubscription() : null;
 
   if (sub) {
-    try {
-      await managerSupabase
-        .from('push_subscriptions')
-        .delete()
-        .match({ user_id: userId, endpoint: sub.endpoint });
-    } catch {
-      // Ignore DB delete error
+    if (ctx.hasManagerAccess) {
+      try {
+        await managerSupabase
+          .from('push_subscriptions')
+          .delete()
+          .match({ user_id: ctx.userId, endpoint: sub.endpoint });
+      } catch {
+        // Ignore DB delete error
+      }
+    }
+    if (ctx.hasQaqcAccess && ctx.userEmail) {
+      try {
+        await qaqcSupabase
+          .from('qaqc_push_subscriptions')
+          .delete()
+          .match({ user_email: ctx.userEmail.trim().toLowerCase(), endpoint: sub.endpoint });
+      } catch {
+        // Ignore DB delete error
+      }
     }
     try {
       await sub.unsubscribe();
@@ -258,5 +385,5 @@ export async function disablePushNotifications(
     }
   }
 
-  return { ok: true, status: await getPushStatus(userId) };
+  return { ok: true, status: await getPushStatus(ctx) };
 }

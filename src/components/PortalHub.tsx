@@ -300,16 +300,27 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     setActiveApp({ app, baseUrl: targetUrl, url: destinationUrl });
   }, [apps, buildAuthenticatedAppUrl, currentUser]);
 
-  // Sync push notification status on login / mount
+  const getPushContext = useCallback(() => {
+    const managerApp = apps.find((a) => a.id === 'manager');
+    const qaqcApp = apps.find((a) => a.id === 'qaqc');
+    return {
+      userId: currentUser.id,
+      userEmail: currentUser.email,
+      hasManagerAccess: managerApp ? checkAppAccess(managerApp) : false,
+      hasQaqcAccess: qaqcApp ? checkAppAccess(qaqcApp) : false,
+    };
+  }, [apps, currentUser]);
+
+  // Sync push notification status on login / mount / apps loaded
   useEffect(() => {
     let cancelled = false;
-    getPushStatus(currentUser.id).then((status) => {
+    getPushStatus(getPushContext()).then((status) => {
       if (!cancelled) setPushStatus(status);
     });
     return () => {
       cancelled = true;
     };
-  }, [currentUser.id]);
+  }, [getPushContext]);
 
   // Open target app when launched from a notification tap (?app=manager or ?app=qaqc&path=/downtime)
   useEffect(() => {
@@ -352,12 +363,13 @@ export const PortalHub: React.FC<PortalHubProps> = ({ currentUser, onLogout }) =
     setPushBanner(null);
 
     try {
+      const pushCtx = getPushContext();
       if (pushStatus?.isSubscribed) {
-        const res = await disablePushNotifications(currentUser.id);
+        const res = await disablePushNotifications(pushCtx);
         setPushStatus(res.status);
         setPushBanner({ type: 'info', text: 'Push notifications turned off on this device.' });
       } else {
-        const res = await enablePushNotifications(currentUser.id);
+        const res = await enablePushNotifications(pushCtx);
         setPushStatus(res.status);
         if (res.ok) {
           setPushBanner({
